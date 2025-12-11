@@ -55,6 +55,29 @@ def train_model(
     X_train, y_train = train_df.drop(columns=[target]), train_df[target]
     X_eval, y_eval = eval_df.drop(columns=[target]), eval_df[target]
 
+    # ---------------------------
+    # CLEANUP: remove bad columns
+    # ---------------------------
+
+    # 1) Drop leftover original city columns (raw text or encoded)
+    #    They cause object dtypes and are redundant if you already have
+    #    one-hot encoded city_norm_* features.
+    cols_to_drop = ["city_norm", "city_encoded", "city"]
+    X_train = X_train.drop(columns=cols_to_drop, errors="ignore")
+    X_eval = X_eval.drop(columns=cols_to_drop, errors="ignore")
+
+    # 2) Keep only numeric + bool columns for XGBoost
+    X_train = X_train.select_dtypes(include=["number", "bool"])
+    X_eval = X_eval.select_dtypes(include=["number", "bool"])
+
+    # 3) Handle missing values
+    X_train = X_train.fillna(0)
+    X_eval = X_eval.fillna(0)
+
+    # Optional sanity prints (can remove later)
+    print("Train dtypes after cleanup:\n", X_train.dtypes)
+    print("Eval dtypes after cleanup:\n", X_eval.dtypes)
+
     params = {
         "n_estimators": 500,
         "learning_rate": 0.05,

@@ -1,6 +1,4 @@
-# ==========================================
-# Python-generated files
-# ==========================================
+
 __pycache__/
 *.py[oc]
 *.pyo
@@ -17,11 +15,7 @@ wheels/
 .env/
 *.env
 
-# ==========================================
-# Project-specific ignores
-# ==========================================
-
-# Datasets (raw + processed)
+# Datasets 
 data/
 
 # MLflow experiment tracking

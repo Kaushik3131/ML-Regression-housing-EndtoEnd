@@ -48,6 +48,27 @@ def _load_data(
     target = "price"
     X_train, y_train = train_df.drop(columns=[target]), train_df[target]
     X_eval, y_eval = eval_df.drop(columns=[target]), eval_df[target]
+
+    # ---------------------------
+    # CLEANUP: match train.py
+    # ---------------------------
+
+    # 1) Drop leftover original city columns
+    cols_to_drop = ["city_norm", "city_encoded", "city"]
+    X_train = X_train.drop(columns=cols_to_drop, errors="ignore")
+    X_eval = X_eval.drop(columns=cols_to_drop, errors="ignore")
+
+    # 2) Keep only numeric + bool columns
+    X_train = X_train.select_dtypes(include=["number", "bool"])
+    X_eval = X_eval.select_dtypes(include=["number", "bool"])
+
+    # 3) Handle missing values
+    X_train = X_train.fillna(0)
+    X_eval = X_eval.fillna(0)
+
+    # Optional sanity check
+    # print("Tuning X_train dtypes:\n", X_train.dtypes)
+
     return X_train, y_train, X_eval, y_eval
 
 
@@ -66,7 +87,8 @@ def tune_model(
         mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(experiment_name)
 
-    X_train, y_train, X_eval, y_eval = _load_data(train_path, eval_path, sample_frac, random_state)
+    X_train, y_train, X_eval, y_eval = _load_data(
+        train_path, eval_path, sample_frac, random_state)
 
     def objective(trial: optuna.Trial):
         params = {
@@ -105,7 +127,8 @@ def tune_model(
     print("✅ Best params from Optuna:", best_params)
 
     # Retrain best model
-    best_model = XGBRegressor(**{**best_params, "random_state": random_state, "n_jobs": -1, "tree_method": "hist"})
+    best_model = XGBRegressor(
+        **{**best_params, "random_state": random_state, "n_jobs": -1, "tree_method": "hist"})
     best_model.fit(X_train, y_train)
     y_pred = best_model.predict(X_eval)
     best_metrics = {

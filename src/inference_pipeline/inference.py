@@ -27,7 +27,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MODEL = PROJECT_ROOT / "models" / "xgb_best_model.pkl"
 DEFAULT_FREQ_ENCODER = PROJECT_ROOT / "models" / "freq_encoder.pkl"
 DEFAULT_TARGET_ENCODER = PROJECT_ROOT / "models" / "target_encoder.pkl"
-TRAIN_FE_PATH = PROJECT_ROOT / "data" / "processed" / "feature_engineered_train.csv"
+TRAIN_FE_PATH = PROJECT_ROOT / "data" / \
+    "processed" / "feature_engineered_train.csv"
 DEFAULT_OUTPUT = PROJECT_ROOT / "predictions.csv"
 
 print("📂 Inference using project root:", PROJECT_ROOT)
@@ -35,7 +36,8 @@ print("📂 Inference using project root:", PROJECT_ROOT)
 # Load training feature columns (strict schema from training dataset)
 if TRAIN_FE_PATH.exists():
     _train_cols = pd.read_csv(TRAIN_FE_PATH, nrows=1)
-    TRAIN_FEATURE_COLUMNS = [c for c in _train_cols.columns if c != "price"]  # excluding price column
+    # excluding price column
+    TRAIN_FEATURE_COLUMNS = [c for c in _train_cols.columns if c != "price"]
 else:
     TRAIN_FEATURE_COLUMNS = None
 
@@ -80,12 +82,36 @@ def predict(
         y_true = df["price"].tolist()
         df = df.drop(columns=["price"])
 
-    # Step 5: Align columns with training schema
-    if TRAIN_FEATURE_COLUMNS is not None:
+    # 🔹 NEW: load model here so we can align to its training schema
+    model = load(model_path)
+
+    # 🔹 NEW: drop leftover city columns that caused dtype errors
+    cols_to_drop = ["city_norm", "city_encoded", "city"]
+    df = df.drop(columns=cols_to_drop, errors="ignore")
+
+    # 🔹 NEW: keep only numeric + bool columns
+    df = df.select_dtypes(include=["number", "bool"])
+
+    # 🔹 NEW: handle missing values
+    df = df.fillna(0)
+
+    # 🔹 NEW: align columns to model’s training features first
+    if hasattr(model, "feature_names_in_"):
+        train_cols = list(model.feature_names_in_)
+
+        # Add missing columns with 0
+        for col in train_cols:
+            if col not in df.columns:
+                df[col] = 0
+
+        # Drop extras and order exactly as in training
+        df = df[train_cols]
+
+    # Fallback: if model doesn't have feature_names_in_, use TRAIN_FEATURE_COLUMNS
+    elif TRAIN_FEATURE_COLUMNS is not None:
         df = df.reindex(columns=TRAIN_FEATURE_COLUMNS, fill_value=0)
 
-    # Step 6: Load model & predict
-    model = load(model_path)
+    # Step 6: Predict
     preds = model.predict(df)
 
     # Step 7: Build output
@@ -102,12 +128,18 @@ def predict(
 # ----------------------------
 # Allows running inference directly from terminal.
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run inference on new housing data (raw).")
-    parser.add_argument("--input", type=str, required=True, help="Path to input RAW CSV file")
-    parser.add_argument("--output", type=str, default=str(DEFAULT_OUTPUT), help="Path to save predictions CSV")
-    parser.add_argument("--model", type=str, default=str(DEFAULT_MODEL), help="Path to trained model file")
-    parser.add_argument("--freq_encoder", type=str, default=str(DEFAULT_FREQ_ENCODER), help="Path to frequency encoder pickle")
-    parser.add_argument("--target_encoder", type=str, default=str(DEFAULT_TARGET_ENCODER), help="Path to target encoder pickle")
+    parser = argparse.ArgumentParser(
+        description="Run inference on new housing data (raw).")
+    parser.add_argument("--input", type=str, required=True,
+                        help="Path to input RAW CSV file")
+    parser.add_argument("--output", type=str, default=str(DEFAULT_OUTPUT),
+                        help="Path to save predictions CSV")
+    parser.add_argument(
+        "--model", type=str, default=str(DEFAULT_MODEL), help="Path to trained model file")
+    parser.add_argument("--freq_encoder", type=str, default=str(
+        DEFAULT_FREQ_ENCODER), help="Path to frequency encoder pickle")
+    parser.add_argument("--target_encoder", type=str, default=str(
+        DEFAULT_TARGET_ENCODER), help="Path to target encoder pickle")
 
     args = parser.parse_args()
 

@@ -28,7 +28,8 @@ def load_and_split_data(
 
     # Splits
     train_df = df[df["date"] < cutoff_date_eval]
-    eval_df = df[(df["date"] >= cutoff_date_eval) & (df["date"] < cutoff_date_holdout)]
+    eval_df = df[(df["date"] >= cutoff_date_eval) &
+                 (df["date"] < cutoff_date_holdout)]
     holdout_df = df[df["date"] >= cutoff_date_holdout]
 
     # Save
@@ -39,7 +40,8 @@ def load_and_split_data(
     holdout_df.to_csv(outdir / "holdout.csv", index=False)
 
     print(f"✅ Data split completed (saved to {outdir}).")
-    print(f"   Train: {train_df.shape}, Eval: {eval_df.shape}, Holdout: {holdout_df.shape}")
+    print(
+        f"   Train: {train_df.shape}, Eval: {eval_df.shape}, Holdout: {holdout_df.shape}")
 
     return train_df, eval_df, holdout_df
 

@@ -36,7 +36,36 @@ def evaluate_model(
     target = "price"
     X_eval, y_eval = eval_df.drop(columns=[target]), eval_df[target]
 
+    # ---------------------------
+    # CLEANUP: match train.py
+    # ---------------------------
+
+    # 1) Drop leftover original city columns (same as in train.py)
+    cols_to_drop = ["city_norm", "city_encoded", "city"]
+    X_eval = X_eval.drop(columns=cols_to_drop, errors="ignore")
+
+    # 2) Keep only numeric + bool columns
+    X_eval = X_eval.select_dtypes(include=["number", "bool"])
+
+    # 3) Handle missing values
+    X_eval = X_eval.fillna(0)
+
+    # Load model AFTER preprocessing, so we can align columns to it
     model = load(model_path)
+
+    # 4) (Optional but safer) Align eval columns to training columns
+    #    This ensures the same features in same order.
+    if hasattr(model, "feature_names_in_"):
+        train_cols = list(model.feature_names_in_)
+
+        # Add any missing columns with 0
+        for col in train_cols:
+            if col not in X_eval.columns:
+                X_eval[col] = 0
+
+        # Drop any extra columns not seen during training
+        X_eval = X_eval[train_cols]
+
     y_pred = model.predict(X_eval)
 
     mae = float(mean_absolute_error(y_eval, y_pred))
